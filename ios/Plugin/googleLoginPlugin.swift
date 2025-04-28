@@ -1,47 +1,55 @@
+
 import Foundation
 import Capacitor
 import GoogleSignIn
 
-/**
- * Please read the Capacitor iOS Plugin Development Guide
- * here: https://capacitorjs.com/docs/plugins/ios
- */
+
 @objc(googleLoginPlugin)
 public class googleLoginPlugin: CAPPlugin {
+  
+  @objc func googleLogin(_ call: CAPPluginCall) {
     
-    // jsCode => here
-    @objc func googleLogin(_ call: CAPPluginCall)
+    guard let googleClientId = call.getString("googleClientId") else {
+      call.reject("googleClientId not provided")
+      return
+    }
     
-    {
-        
-        guard let googleClientId = call.getString("googleClientId") else {
-            call.reject("googleClientId not provided")
-            return
-        }
-        
-        let googleSignInConfiguration = GIDConfiguration.init(clientID:googleClientId)
-        
-        guard let presentingVc = self.bridge?.viewController else {
-            call.reject("No presenting view controller")
-            return
-        }
-        
-        GIDSignIn.sharedInstance.signIn(withPresenting: presentingVc) {user, error in
-            
-            if error != nil {
-                call.reject(error.debugDescription)
+    guard let presentingVc = self.bridge?.viewController else {
+      call.reject("No presenting view controller")
+      return
+    }
+    
+    let clientID = googleClientId
+    let configuration = GIDConfiguration(clientID: clientID)
+    
+    Task {
+        do {
+            try await GIDSignIn.sharedInstance.signIn(with: configuration, presenting: presentingVc)
+
+            guard let user = GIDSignIn.sharedInstance.currentUser else {
+                call.reject("No user signed in")
+                return
             }
-            
-            if let result = user, let googleUser = result.user as? GIDGoogleUser, let email = googleUser.profile?.email {
-                call.resolve([
-                    "email": email
-                ])
+
+            guard let idToken = user.authentication.idToken else {
+                call.reject("No identity token")
+                return
             }
+
+            let email = user.profile?.email ?? ""
+
+            call.resolve([
+                "identityToken": idToken,
+                "email": email
+            ])
+        } catch {
+            call.reject(error.localizedDescription)
         }
     }
     
-    
+  }
+  
+  
+  
+  
 }
-
-
-
